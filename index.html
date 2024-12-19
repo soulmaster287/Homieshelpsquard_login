@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login and Manage Accounts</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        form, .account, .editProfile, .promptSection {
+            max-width: 400px; margin: 10px auto; padding: 15px;
+            border: 1px solid #ddd; border-radius: 10px;
+        }
+        input, button, textarea {
+            width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px;
+        }
+        button {
+            background: #007BFF; color: white; border: none; cursor: pointer;
+        }
+        button:hover { background: #0056b3; }
+        .hidden { display: none; }
+        .deleteBtn { background: #dc3545; color: white; padding: 5px; border-radius: 5px; cursor: pointer; }
+        .editBtn { background: #28a745; color: white; padding: 5px; border-radius: 5px; cursor: pointer; }
+        .success { color: green; margin: 10px 0; }
+        .error { color: red; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <button id="logoutButton" class="hidden" onclick="logout()">Logout</button>
+
+    <!-- Login Page -->
+    <div id="loginPage">
+        <h2>Login</h2>
+        <form id="loginForm" onsubmit="validateLogin(event)">
+            <input type="email" id="email" placeholder="Email" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+            <p id="loginError" class="error hidden">Invalid email or password!</p>
+        </form>
+    </div>
+
+    <!-- Employee Page -->
+    <div id="employeePage" class="hidden">
+        <h2>Welcome Employee</h2>
+        <!-- Create Account Form -->
+        <form id="createAccountForm" onsubmit="createAccount(event)">
+            <select id="role" required>
+                <option value="student">Student</option>
+                <option value="employee">Employee</option>
+            </select>
+            <input type="text" id="name" placeholder="Full Name" required>
+            <input type="email" id="emailCreate" placeholder="Email" required>
+            <input type="password" id="passwordCreate" placeholder="Password" required>
+            <button type="submit">Create Account</button>
+            <p id="createSuccess" class="success hidden">Account Created Successfully!</p>
+        </form>
+
+        <!-- Student Accounts -->
+        <div id="studentAccounts">
+            <h3>Student Accounts</h3>
+            <div id="accountsContainer"></div>
+        </div>
+
+        <!-- Assign Custom Prompts -->
+        <div class="promptSection">
+            <h3>Assign Custom Prompt</h3>
+            <input type="email" id="promptEmail" placeholder="Student Email" required>
+            <textarea id="customPrompt" placeholder="Write custom prompt here"></textarea>
+            <button onclick="assignCustomPrompt()">Assign Prompt</button>
+            <p id="promptSuccess" class="success hidden">Prompt Assigned Successfully!</p>
+        </div>
+    </div>
+
+    <!-- Student Page -->
+    <div id="studentPage" class="hidden">
+        <h2>Welcome, <span id="studentName"></span></h2>
+        <div>
+            <h4>Your Custom Prompt:</h4>
+            <p id="studentPrompt">No prompt assigned.</p>
+        </div>
+        <!-- Edit Profile -->
+        <div class="editProfile">
+            <h4>Edit Your Profile</h4>
+            <form id="editProfileForm" onsubmit="editProfile(event)">
+                <input type="text" id="editName" placeholder="Name" required>
+                <input type="email" id="editEmail" placeholder="Email" required>
+                <input type="password" id="editPassword" placeholder="Password" required>
+                <button type="submit">Save Changes</button>
+                <p id="editSuccess" class="success hidden">Profile Updated Successfully!</p>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'users_data';
+        const SESSION_KEY = 'current_user';
+        const PROMPT_KEY = 'student_prompts';
+
+        let users = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [{ role: 'employee', name: 'Gulshan Kumar', email: 'gk7114245@gmail.com', password: 'gk@17' }];
+        let prompts = JSON.parse(localStorage.getItem(PROMPT_KEY)) || {};
+        let currentUser = JSON.parse(localStorage.getItem(SESSION_KEY)) || null;
+
+        // Save Data
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
+            localStorage.setItem(PROMPT_KEY, JSON.stringify(prompts));
+        }
+
+        function saveSession(user) {
+            currentUser = user;
+            localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        }
+
+        function validateLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim(); // Trim password for safety
+
+            const user = users.find(u => u.email === email && u.password === password);
+            if (user) {
+                saveSession(user);
+                document.getElementById('loginPage').classList.add('hidden');
+                document.getElementById('logoutButton').classList.remove('hidden');
+                if (user.role === 'employee') showEmployeePage();
+                else showStudentPage(user);
+            } else {
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        }
+
+
+        function createAccount(event) {
+            event.preventDefault();
+            const role = document.getElementById('role').value;
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('emailCreate').value.trim();
+            const password = document.getElementById('passwordCreate').value;
+
+            if (users.some(u => u.email === email)) return alert('Email already exists!');
+            users.push({ role, name, email, password });
+            saveData();
+            displayAccounts();
+            document.getElementById('createSuccess').classList.remove('hidden');
+        }
+
+        function displayAccounts() {
+            const container = document.getElementById('accountsContainer');
+            container.innerHTML = '';
+            users.filter(u => u.role === 'student').forEach((user, index) => {
+                container.innerHTML += `
+                    <div class="account">
+                        <strong>${user.name}</strong> | ${user.email}
+                        <button class="editBtn" onclick="editAccount(${index})">Edit</button>
+                        <button class="deleteBtn" onclick="deleteAccount(${index})">Delete</button>
+                    </div>
+                `;
+            });
+        }
+
+        function assignCustomPrompt() {
+            const email = document.getElementById('promptEmail').value.trim();
+            const prompt = document.getElementById('customPrompt').value.trim();
+
+            if (!email || !prompt) return alert('Both fields are required!');
+
+            prompts[email] = prompt;
+            saveData();
+            document.getElementById('promptSuccess').classList.remove('hidden');
+        }
+
+        function showEmployeePage() {
+            document.getElementById('employeePage').classList.remove('hidden');
+            displayAccounts();
+        }
+
+        function showStudentPage(user) {
+            document.getElementById('studentPage').classList.remove('hidden');
+            document.getElementById('studentName').innerText = user.name;
+            document.getElementById('studentPrompt').innerText = prompts[user.email] || 'No prompt assigned.';
+            document.getElementById('editName').value = user.name;
+            document.getElementById('editEmail').value = user.email;
+        }
+
+        function editProfile(event) {
+            event.preventDefault();
+            currentUser.name = document.getElementById('editName').value.trim();
+            currentUser.email = document.getElementById('editEmail').value.trim();
+            currentUser.password = document.getElementById('editPassword').value;
+            saveSession(currentUser);
+            saveData();
+            document.getElementById('editSuccess').classList.remove('hidden');
+        }
+
+        function deleteAccount(index) {
+            users.splice(index, 1);
+            saveData();
+            displayAccounts();
+        }
+
+        function logout() {
+            localStorage.removeItem(SESSION_KEY);
+            location.reload();
+        }
+
+        if (currentUser) {
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('logoutButton').classList.remove('hidden');
+            if (currentUser.role === 'employee') showEmployeePage();
+            else showStudentPage(currentUser);
+        }
+    </script>
+</body>
+</html>
